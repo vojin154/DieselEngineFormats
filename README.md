@@ -14,6 +14,9 @@ I may do some bits here and there in the future. Feel free to fork this repo or 
 | bundle | x | x |
 | script files* | x | x |
 | bnk | x | x |
+| crate | x | |
+| crates.shipping_manifest | x | |
+| crates.properties | x | |
 
 Bundle/blb/Script file support should work for PD:TH/PD2/PD2 Linux files
 

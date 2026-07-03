@@ -169,7 +169,8 @@ namespace DieselEngineFormats.ZLib
             result.FDict = Convert.ToBoolean(Convert.ToByte((pFlag & 0x20) >> 5));
             result.FLevel = (FLevel)Convert.ToByte((pFlag & 0xC0) >> 6);
 
-            result.IsSupportedZLibStream = (result.CompressionMethod == 8) && (result.CompressionInfo == 7) && (((pCMF * 256 + pFlag) % 31 == 0)) && (result.FDict == false);
+            // CINFO may be 0-7 per RFC 1950 (window size = 2^(CINFO+8)); only >7 is invalid.
+            result.IsSupportedZLibStream = (result.CompressionMethod == 8) && (result.CompressionInfo <= 7) && (((pCMF * 256 + pFlag) % 31 == 0)) && (result.FDict == false);
 
             return result;
         }

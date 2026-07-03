@@ -25,17 +25,6 @@
         /// </summary>
         public int Length { get; set; }
 
-		public string FileSize{
-			get {
-				long bytesNo = this.Length;
-
-				if (bytesNo < 1024)
-					return bytesNo.ToString () + " B";
-				else
-					return string.Format ("{0:n0}", bytesNo / 1024) + " KB";
-			}
-		}
-
 		public PackageHeader Parent { get; set; }
 
 		public Idstring PackageName {get { return this.Parent?.Name; }}
