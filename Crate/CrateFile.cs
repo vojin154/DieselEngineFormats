@@ -88,8 +88,8 @@ namespace DieselEngineFormats.Crate
     ///     Reader for the self-contained .crate package format. A .crate
     ///     carries its own table of contents and asset data in one file.
     ///
-    ///     Layout: header (16 bytes: magic "YAOI", format, entry count,
-    ///     reserved), then `count` * 48-byte CrateFileEntry records, then the
+    ///     Layout: header (16 bytes: magic "YAOI", format, 64-bit entry
+    ///     count), then `count` * 48-byte CrateFileEntry records, then the
     ///     data region starting at the fixed offset DataRegionStart.
     /// </summary>
     public class CrateFile : DieselFormat

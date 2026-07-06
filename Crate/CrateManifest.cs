@@ -72,7 +72,7 @@ namespace DieselEngineFormats.Crate
     ///     exist and what type they are, across every .crate file. No offsets/
     ///     sizes -- open the individual CrateFile to extract data.
     ///
-    ///     Layout: global header (12 bytes: version, block count, reserved),
+    ///     Layout: global header (12 bytes: version, 64-bit block count),
     ///     then exactly BlockCount blocks (crate name, entry count, that many
     ///     32-byte CrateManifestEntry records), then a trailer: a variable-
     ///     length patch/source list followed by the same property/bitflag table
