@@ -44,7 +44,7 @@ namespace DieselEngineFormats.Crate
         ///     Resolve via crates.properties / CratePropertyList (flag ->
         ///     name), not HashIndex.
         /// </summary>
-        public ulong VariantFlag { get; set; }
+        public uint VariantFlag { get; set; }
 
         public CrateFile Parent { get; set; }
 
@@ -62,7 +62,8 @@ namespace DieselEngineFormats.Crate
             Offset = br.ReadUInt64();
             RawSize = br.ReadUInt64();
             StoredSize = br.ReadUInt64();
-            VariantFlag = br.ReadUInt64();
+            VariantFlag = br.ReadUInt32();
+            br.ReadUInt32(); // likely padding
         }
 
         public void WriteEntry(BinaryWriter bw)
@@ -73,6 +74,7 @@ namespace DieselEngineFormats.Crate
             bw.Write(RawSize);
             bw.Write(StoredSize);
             bw.Write(VariantFlag);
+            bw.Write(0u); // likely padding
         }
 
         public override string ToString()
@@ -86,8 +88,8 @@ namespace DieselEngineFormats.Crate
     ///     Reader for the self-contained .crate package format. A .crate
     ///     carries its own table of contents and asset data in one file.
     ///
-    ///     Layout: header (16 bytes: magic "YAOI", format, entry count,
-    ///     reserved), then `count` * 48-byte CrateFileEntry records, then the
+    ///     Layout: header (16 bytes: magic "YAOI", format, 64-bit entry
+    ///     count), then `count` * 48-byte CrateFileEntry records, then the
     ///     data region starting at the fixed offset DataRegionStart.
     /// </summary>
     public class CrateFile : DieselFormat
@@ -125,12 +127,11 @@ namespace DieselEngineFormats.Crate
                 throw new InvalidDataException($"Not a .crate file (expected magic 0x{Magic:X8}, got 0x{magic:X8})");
 
             Format = br.ReadUInt32();
-            uint count = br.ReadUInt32();
-            br.ReadUInt32(); // reserved
+            ulong count = br.ReadUInt64();
 
             Entries.Clear();
             Entries.Capacity = (int)count;
-            for (int i = 0; i < count; i++)
+            for (ulong i = 0; i < count; i++)
                 Entries.Add(new CrateFileEntry(br) { Parent = this });
         }
 
@@ -144,33 +145,35 @@ namespace DieselEngineFormats.Crate
                 return Array.Empty<byte>();
 
             if (entry.StoredSize == 0)
-                return ReadRaw(stream, entry.Offset, entry.RawSize, entry);
+                return ReadExact(stream, entry.Offset, entry.RawSize, entry);
 
-            stream.Position = (long)entry.Offset;
-            byte[] compressed = new byte[entry.StoredSize];
-            int readTotal = 0;
-            while (readTotal < compressed.Length)
-            {
-                int read = stream.Read(compressed, readTotal, compressed.Length - readTotal);
-                if (read <= 0)
-                    throw new EndOfStreamException($"Unexpected end of stream reading entry {entry} at offset {entry.Offset}");
-                readTotal += read;
-            }
+            byte[] compressed = ReadExact(stream, entry.Offset, entry.StoredSize, entry);
 
             using var input = new MemoryStream(compressed);
             using var output = new MemoryStream((int)entry.RawSize);
             General.ZLibDecompress(input, output);
 
-            byte[] result = output.ToArray();
-            if ((ulong)result.LongLength != entry.RawSize)
+            if ((ulong)output.Length != entry.RawSize)
                 throw new InvalidDataException(
-                    $"Decompressed size {result.LongLength} does not match declared raw size {entry.RawSize} for entry {entry}");
+                    $"Decompressed size {output.Length} does not match declared raw size {entry.RawSize} for entry {entry}");
 
-            return result;
+            // GetBuffer avoids a copy: output never grew past its RawSize capacity
+            // (guaranteed by the length check above), so the backing array is
+            // exactly RawSize bytes.
+            return output.GetBuffer();
         }
 
-        private static byte[] ReadRaw(Stream stream, ulong offset, ulong length, CrateFileEntry entry)
+        /// <summary>
+        ///     Seeks to <paramref name="offset"/> and reads exactly
+        ///     <paramref name="length"/> bytes, validating the range against the
+        ///     stream before allocating
+        /// </summary>
+        private static byte[] ReadExact(Stream stream, ulong offset, ulong length, CrateFileEntry entry)
         {
+            if (offset + length > (ulong)stream.Length)
+                throw new InvalidDataException(
+                    $"Entry {entry} at offset {offset} with length {length} extends past end of stream ({stream.Length})");
+
             stream.Position = (long)offset;
             byte[] data = new byte[length];
             int readTotal = 0;
