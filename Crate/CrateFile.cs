@@ -44,7 +44,7 @@ namespace DieselEngineFormats.Crate
         ///     Resolve via crates.properties / CratePropertyList (flag ->
         ///     name), not HashIndex.
         /// </summary>
-        public ulong VariantFlag { get; set; }
+        public uint VariantFlag { get; set; }
 
         public CrateFile Parent { get; set; }
 
@@ -62,7 +62,8 @@ namespace DieselEngineFormats.Crate
             Offset = br.ReadUInt64();
             RawSize = br.ReadUInt64();
             StoredSize = br.ReadUInt64();
-            VariantFlag = br.ReadUInt64();
+            VariantFlag = br.ReadUInt32();
+            br.ReadUInt32(); // likely padding
         }
 
         public void WriteEntry(BinaryWriter bw)
@@ -73,6 +74,7 @@ namespace DieselEngineFormats.Crate
             bw.Write(RawSize);
             bw.Write(StoredSize);
             bw.Write(VariantFlag);
+            bw.Write(0u); // likely padding
         }
 
         public override string ToString()
@@ -125,12 +127,11 @@ namespace DieselEngineFormats.Crate
                 throw new InvalidDataException($"Not a .crate file (expected magic 0x{Magic:X8}, got 0x{magic:X8})");
 
             Format = br.ReadUInt32();
-            uint count = br.ReadUInt32();
-            br.ReadUInt32(); // reserved
+            ulong count = br.ReadUInt64();
 
             Entries.Clear();
             Entries.Capacity = (int)count;
-            for (int i = 0; i < count; i++)
+            for (ulong i = 0; i < count; i++)
                 Entries.Add(new CrateFileEntry(br) { Parent = this });
         }
 

@@ -28,14 +28,15 @@ namespace DieselEngineFormats.Crate
         ///     here -- the manifest doesn't list every variant. Use the .crate
         ///     TOCs as the source of truth for variants.
         /// </summary>
-        public ulong VariantFlag { get; set; }
+        public uint VariantFlag { get; set; }
 
         public CrateManifestEntry(BinaryReader br)
         {
             Extension = HashIndex.Get(br.ReadUInt64());
             Path = HashIndex.Get(br.ReadUInt64());
             Timestamp = br.ReadUInt64();
-            VariantFlag = br.ReadUInt64();
+            VariantFlag = br.ReadUInt32();
+            br.ReadUInt32(); // likely padding
         }
 
         public override string ToString() => $"{Path}.{Extension}";
@@ -82,7 +83,7 @@ namespace DieselEngineFormats.Crate
         public uint Version { get; set; }
 
         /// <summary>Number of blocks that follow the header.</summary>
-        public uint BlockCount { get; set; }
+        public ulong BlockCount { get; set; }
 
         public List<CrateManifestBlock> Blocks { get; } = new List<CrateManifestBlock>();
 
@@ -95,12 +96,11 @@ namespace DieselEngineFormats.Crate
         public override void ReadFile(BinaryReader br)
         {
             Version = br.ReadUInt32();
-            BlockCount = br.ReadUInt32();
-            br.ReadUInt32(); // reserved
+            BlockCount = br.ReadUInt64();
 
             Blocks.Clear();
             Blocks.Capacity = (int)BlockCount;
-            for (uint b = 0; b < BlockCount; b++)
+            for (ulong b = 0; b < BlockCount; b++)
             {
                 string name = ReadCString(br);
                 ulong count = br.ReadUInt64();
@@ -181,19 +181,18 @@ namespace DieselEngineFormats.Crate
             if (magic != Magic)
                 throw new InvalidDataException($"Not a crates.properties file (expected magic 0x{Magic:X8}, got 0x{magic:X8})");
 
-            uint count = br.ReadUInt32();
-            br.ReadUInt32(); // reserved
+            ulong count = br.ReadUInt64();
 
             Properties.Clear();
             Properties.Capacity = (int)count;
-            for (int i = 0; i < count; i++)
+            for (ulong i = 0; i < count; i++)
             {
                 var entry = new CratePropertyEntry
                 {
                     Name = HashIndex.Get(br.ReadUInt64()),
                     Flag = br.ReadUInt32(),
                 };
-                br.ReadUInt32(); // reserved
+                br.ReadUInt32(); // likely padding
                 Properties.Add(entry);
             }
         }
