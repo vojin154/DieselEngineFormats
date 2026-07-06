@@ -145,33 +145,35 @@ namespace DieselEngineFormats.Crate
                 return Array.Empty<byte>();
 
             if (entry.StoredSize == 0)
-                return ReadRaw(stream, entry.Offset, entry.RawSize, entry);
+                return ReadExact(stream, entry.Offset, entry.RawSize, entry);
 
-            stream.Position = (long)entry.Offset;
-            byte[] compressed = new byte[entry.StoredSize];
-            int readTotal = 0;
-            while (readTotal < compressed.Length)
-            {
-                int read = stream.Read(compressed, readTotal, compressed.Length - readTotal);
-                if (read <= 0)
-                    throw new EndOfStreamException($"Unexpected end of stream reading entry {entry} at offset {entry.Offset}");
-                readTotal += read;
-            }
+            byte[] compressed = ReadExact(stream, entry.Offset, entry.StoredSize, entry);
 
             using var input = new MemoryStream(compressed);
             using var output = new MemoryStream((int)entry.RawSize);
             General.ZLibDecompress(input, output);
 
-            byte[] result = output.ToArray();
-            if ((ulong)result.LongLength != entry.RawSize)
+            if ((ulong)output.Length != entry.RawSize)
                 throw new InvalidDataException(
-                    $"Decompressed size {result.LongLength} does not match declared raw size {entry.RawSize} for entry {entry}");
+                    $"Decompressed size {output.Length} does not match declared raw size {entry.RawSize} for entry {entry}");
 
-            return result;
+            // GetBuffer avoids a copy: output never grew past its RawSize capacity
+            // (guaranteed by the length check above), so the backing array is
+            // exactly RawSize bytes.
+            return output.GetBuffer();
         }
 
-        private static byte[] ReadRaw(Stream stream, ulong offset, ulong length, CrateFileEntry entry)
+        /// <summary>
+        ///     Seeks to <paramref name="offset"/> and reads exactly
+        ///     <paramref name="length"/> bytes, validating the range against the
+        ///     stream before allocating
+        /// </summary>
+        private static byte[] ReadExact(Stream stream, ulong offset, ulong length, CrateFileEntry entry)
         {
+            if (offset + length > (ulong)stream.Length)
+                throw new InvalidDataException(
+                    $"Entry {entry} at offset {offset} with length {length} extends past end of stream ({stream.Length})");
+
             stream.Position = (long)offset;
             byte[] data = new byte[length];
             int readTotal = 0;
