@@ -3,6 +3,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text;
 using System.Security;
+using System.Globalization;
 
 namespace DieselEngineFormats.ScriptData {
 	
@@ -29,7 +30,7 @@ namespace DieselEngineFormats.ScriptData {
 				indentation.Append("\t");
 
 			StringBuilder sb = new StringBuilder();
-            //Remove space characters as they are invalid in xml
+			//Remove space characters as they are invalid in xml
 			sb.Append(indentation.ToString() + "<" + this.meta.Replace(" ", "-"));
 
 			if (!this.index.Equals(-1))
@@ -39,24 +40,33 @@ namespace DieselEngineFormats.ScriptData {
 
 			foreach (KeyValuePair<string, object> kvp in this.attributes)
 			{
-                if (kvp.Value is float[])
-                {
-                    sb.Append(" " + kvp.Key + "=\"");
+				if (kvp.Value is float[])
+				{
+					sb.Append(" " + kvp.Key + "=\"");
 
-                    foreach (float f in (kvp.Value as float[]))
-                        sb.Append(f + " ");
+					foreach (float f in (kvp.Value as float[]))
+						sb.Append(f.ToString(CultureInfo.InvariantCulture) + " ");
 
-                    sb.Remove(sb.Length - 1, 1);
+					sb.Remove(sb.Length - 1, 1);
 
-                    sb.Append("\"");
+					sb.Append("\"");
 
-                }
-                else if (kvp.Value is bool)
-                    sb.Append(" " + kvp.Key + "=\"" + ((bool)kvp.Value ? "true" : "false") + "\"");
-                else
-                {
-                    sb.Append(" " + kvp.Key + "=\"" + (kvp.Value is string && escape ? SecurityElement.Escape(kvp.Value as string) : kvp.Value) + "\"");
-                }
+				}
+				else if (kvp.Value is bool)
+					sb.Append(" " + kvp.Key + "=\"" + ((bool)kvp.Value ? "true" : "false") + "\"");
+				else
+				{
+					string value;
+
+					if (kvp.Value is string)
+						value = escape ? SecurityElement.Escape(kvp.Value as string) : kvp.Value as string;
+					else if (kvp.Value is float)
+						value = ((float)kvp.Value).ToString(CultureInfo.InvariantCulture);
+					else
+						value = kvp.Value.ToString();
+
+					sb.Append(" " + kvp.Key + "=\"" + value + "\"");
+				}
 			}
 
 			if (this.children.Count > 0)
@@ -66,8 +76,8 @@ namespace DieselEngineFormats.ScriptData {
 				for (int j = 0; j < this.children.Count; j++)
 					sb.Append((this.children[j] as CustomXMLNode).ToString(j, escape));
 
-                //Remove space characters as they are invalid in xml
-                sb.Append(indentation.ToString() + "</" + this.meta.Replace(" ", "-") + ">\r\n");
+				//Remove space characters as they are invalid in xml
+				sb.Append(indentation.ToString() + "</" + this.meta.Replace(" ", "-") + ">\r\n");
 			}
 			else
 			{
@@ -75,7 +85,7 @@ namespace DieselEngineFormats.ScriptData {
 				{
 					if (this.index is int && (int)this.index != i + 1)
 						sb.Append(" index=\"" + this.index + "\"");
-                    sb.Append(" value=\"" + (escape ? SecurityElement.Escape(this.data) : this.data) + "\"/>\r\n");
+					sb.Append(" value=\"" + (escape ? SecurityElement.Escape(this.data) : this.data) + "\"/>\r\n");
 				}
 				else
 				{
@@ -188,7 +198,7 @@ namespace DieselEngineFormats.ScriptData {
 					}
 
 					float data_float;
-					if (float.TryParse(attrib_data.ToString(), out data_float))
+					if (float.TryParse(attrib_data.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out data_float) || float.TryParse(attrib_data.ToString(), NumberStyles.Float, CultureInfo.CurrentCulture, out data_float))
 					{
 						this.attributes.Add(attrib_name.ToString(), data_float);
 						attrib_name.Clear();
@@ -205,7 +215,7 @@ namespace DieselEngineFormats.ScriptData {
 						foreach (String spl in splits)
 						{
 							float test_out;
-							if (float.TryParse(spl, out test_out))
+							if (float.TryParse(spl, NumberStyles.Float, CultureInfo.InvariantCulture, out test_out) || float.TryParse(spl, NumberStyles.Float, CultureInfo.CurrentCulture, out test_out))
 							{
 								data_floats.Add(test_out);
 							}
